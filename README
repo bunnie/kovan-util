@@ -1,0 +1,41 @@
+Kovan-util repo
+
+Notes on setup and compilation:
+
+To compile:
+ Source /usr/local/angstrom-eglibc-x86_64-armv5te/environment-setup-armv5te-angstrom-linux-gnueabi
+
+To setup in buildbot:
+ Create a Makefile similar to the following, and put your source files in the SOURCES line:
+
+
+SOURCES=vid.c gradient.c
+OBJECTS=$(SOURCES:.c=.o)
+EXEC=perlin
+MY_CFLAGS += 
+MY_LIBS += 
+
+all: $(OBJECTS)
+$(CC) $(LIBS) $(LDFLAGS) $(OBJECTS) $(MY_LIBS) -o $(EXEC)
+
+clean:
+rm -f $(EXEC) $(OBJECTS)
+
+.c.o:
+$(CC) -c $(CFLAGS) $(MY_CFLAGS) $< -o $@
+
+To test:
+ Compile with "make", and copy the resulting binary to the device.  Because $CC is set to arm-angstrom-linux-gnueabi, it'll compile for ARM.
+
+To build into image:
+ Push your changes
+
+When you're ready to make a recipe:
+
+1) Check out https://github.com/sutajiokousagi/meta-kosagi
+2) Copy recipes-bsp/regutil to wherever directory you want the new project to go.
+3) Since you have a Makefile, you can completely get rid of do_compile() as it will just inherit the default (which is to just run "make").  For botball FPGA stuff, recipes-bsp is probably the correct directory, but recipes-botball might be better.  Your call.
+4) VERY IMPORTANT: Update the SRCREV to reflect the current commit.  You can get the current commit by looking on the github page (there's a handy button to copy it to the clipboard), or run "git rev-parse HEAD".
+5) Set LIC_FILES_CHKSUM to a valid license.  Available license files are at http://cgit.openembedded.org/openembedded-core/tree/meta/files/common-licenses, or you can include a LICENSE in your recipe.
+6) Since we're still in board bringup, the image file we're operating on is meta-kosagi/recipes-misc/images/kovan-bringup-image.bb so add your package there.
+7) Push your changes.
