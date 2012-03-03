@@ -1,11 +1,11 @@
-SOURCES=
+SOURCES=src/jtag.c
 OBJECTS=$(SOURCES:.c=.o)
-EXEC=
+EXEC=jtag-fpga-idcode
 MY_CFLAGS += 
 MY_LIBS += 
 
-#all: $(OBJECTS)
-#	$(CC) $(LIBS) $(LDFLAGS) $(OBJECTS) $(MY_LIBS) -o $(EXEC)
+all: $(OBJECTS)
+	$(CC) $(LIBS) $(LDFLAGS) $(OBJECTS) $(MY_LIBS) -o $(EXEC)
 
 clean:
 	rm -f $(EXEC) $(OBJECTS)
