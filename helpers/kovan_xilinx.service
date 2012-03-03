@@ -1,0 +1,13 @@
+[Unit]
+Description=Kovan Xilinx FPGA Management Service
+After=local-fs.target
+Requires=silvermoon-fpga
+
+[Service]
+ExecStart=/usr/sbin/fpga-config.py
+ExecStop=/bin/sh -c "/bin/echo 'stopping xilinx FPGA management service'"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
