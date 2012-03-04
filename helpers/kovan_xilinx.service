@@ -5,8 +5,8 @@ Requires=silvermoon-fpga
 
 [Service]
 ExecStart=/usr/sbin/fpga-config.py
-ExecStop=/bin/sh -c "/bin/echo 'stopping xilinx FPGA management service'"
-RemainAfterExit=yes
+ExecStop=/usr/sbin/fpga-reset.py
+RemainAfterExit=yes  
 
 [Install]
 WantedBy=multi-user.target
