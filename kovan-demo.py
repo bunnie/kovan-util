@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+#####
+# kovan robotics platform demo program
+####
+
 import sys
 import string
 import fcntl
@@ -9,6 +13,25 @@ from ctypes import *
 import termios
 import select
 import tty
+
+####### constants
+latestVersion = 3
+
+# servo constants
+timediv = 1.0 / 13000000  # time granularity of servo counter, 13 MHz period clock
+servo_period_ = 0.02
+servo_zero_ = 0.0015
+servo_max_ = 0.002
+servo_min_ = 0.001
+
+servo_period = int(servo_period_ / timediv)
+servo_zero = int(servo_zero_ / timediv)
+servo_max = int(servo_max_ / timediv)
+servo_min = int(servo_min_ / timediv)
+
+# motor constants
+mot_baseclk = 208000000 / 4096  # 208MHz base clock for motor
+mot_target_rate = 10000 # 10 kHz target PWM period
 
 #####
 # helper routine to print hex strings from integers; not native in python
@@ -82,96 +105,10 @@ try:
 except IOError, e:
     sys.exit("Can't open /dev/fpga, aborting")
 
+
 def fpgaReset():
     fcntl.ioctl(fpga_dev, fpga_iocreset)
 
-""""
-FROM linux/i2c.h:
-struct i2c_msg {
-	__u16 addr;	/* slave address			*/
-	__u16 flags;
-#define I2C_M_TEN		0x0010	/* this is a ten bit chip address */
-#define I2C_M_RD		0x0001	/* read data, from slave to master */
-#define I2C_M_NOSTART		0x4000	/* if I2C_FUNC_PROTOCOL_MANGLING */
-#define I2C_M_REV_DIR_ADDR	0x2000	/* if I2C_FUNC_PROTOCOL_MANGLING */
-#define I2C_M_IGNORE_NAK	0x1000	/* if I2C_FUNC_PROTOCOL_MANGLING */
-#define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
-#define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
-	__u16 len;		/* msg length				*/
-	__u8 *buf;		/* pointer to msg data			*/
-};
-
-FROM linux/i2c-dev.h:
-/* This is the structure as used in the I2C_RDWR ioctl call */
-struct i2c_rdwr_ioctl_data {
-	struct i2c_msg __user *msgs;	/* pointers to i2c_msgs */
-	__u32 nmsgs;			/* number of i2c_msgs */
-};
-
-#define I2C_RDWR	0x0707	/* Combined R/W transfer (one STOP only) */
-"""
-
-"""
-I2C_M_TEN		= 0x0010 #	/* this is a ten bit chip address */
-I2C_M_RD		= 0x0001 #	/* read data, from slave to master */
-I2C_M_NOSTART		= 0x4000 #	/* if I2C_FUNC_PROTOCOL_MANGLING */
-I2C_M_REV_DIR_ADDR	= 0x2000 #	/* if I2C_FUNC_PROTOCOL_MANGLING */
-I2C_M_IGNORE_NAK	= 0x1000 #	/* if I2C_FUNC_PROTOCOL_MANGLING */
-I2C_M_NO_RD_ACK		= 0x0800 #	/* if I2C_FUNC_PROTOCOL_MANGLING */
-I2C_M_RECV_LEN		= 0x0400 #	/* length will be first received byte */
-
-I2C_RDWR                = 0x0707
-
-class I2C_MSG(Structure):
-    _fields_ = [ ("addr", c_ushort),
-                 ("flags", c_ushort),
-                 ("len", c_ushort),
-                 ("buf", POINTER(c_byte)) ]
-
-class I2C_RDRWR_IOCTL_DATA(Structure):
-    _fields_ = [ ("msgs", POINTER(I2C_MSG)),
-                 ("nmsgs", c_uint) ]
-
-def i2c_read(i2cdev, i2cdevaddr, startreg, data):
-    try:
-        i2cfd = open(i2cdev, 'wb')
-    except IOError, e:
-        sys.exit("Can't open I2C device " + i2cdev)
-
-    output = c_byte(startreg)
-
-    messages = (I2C_MSG * 2)()
-    messages[0].addr = c_ushort(i2cdevaddr)
-    messages[0].flags = c_ushort(i2cdevaddr)
-    messages[0].len = c_ushort(1)
-    import pdb; pdb.set_trace()
-    messages[0].buf = pointer(output)
-
-    messages[1].addr = c_ushort(i2cdevaddr)
-    messages[1].flags = c_ushort(I2C_M_RD)
-    messages[1].len = c_ushort(sizeof(data))
-    messages[1].buf = pointer(data)
-
-    packets = I2C_RDWR_IOCTL_DATA()
-    packets.msgs = messages
-    packets.nmsgs = 2
-
-    try:
-        fcntl.ioctl(i2cfd, I2C_RDWR, pointer(packets), 1)
-    except IOError, e:
-        print "Unable to communicate with i2c device"
-        close(i2cfd)
-        return 1
-
-    close(i2cfd)
-
-    return 0
-
-readbuf = create_string_buffer(256)
-i2c_read("/dev/i2c-0", 0x1e, 0, readbuf)
-
-print sizeof(readbuf), repr(readbuf.raw)
-"""
 
 def test_i2c_calls():
     buf = i2c_read(0x70, 8)
@@ -219,10 +156,10 @@ def i2c_write(startreg, buf):
 kovan_cmds = { 'dig_out_val'     : (0x40, 1, 7, 0, 'rw', 'digital output values'),
                'dig_oe'          : (0x41, 1, 7, 0, 'rw', 'digital output enables'),
                'dig_pu'          : (0x42, 1, 7, 0, 'rw', 'digital pull-up enables'),
-               'ana_pu'          : (0x43, 1, 7, 0, 'rw', 'digital pull-up enables'),
+               'ana_pu'          : (0x43, 1, 7, 0, 'rw', 'analog pull-up enables'),
                'glbl_reset_edge' : (0x45, 1, 2, 2, 'rw', 'reset kovan state machines'),
                'dig_sample'      : (0x45, 1, 1, 1, 'rw', 'sample digital input'),
-               'dig_update'      : (0x45, 1, 0, 0, 'rw', 'update digtial input value'),
+               'dig_update'      : (0x45, 1, 0, 0, 'rw', 'update shift chain values'),
                'adc_go'          : (0x46, 1, 4, 4, 'rw', 'sample ADC data'),
                'adc_chan'        : (0x46, 1, 3, 0, 'rw', 'set ADC channel to sample'),
                'mot_allstop'     : (0x47, 1, 0, 0, 'rw', 'force all motors to stop'),
@@ -254,6 +191,7 @@ kovan_cmds = { 'dig_out_val'     : (0x40, 1, 7, 0, 'rw', 'digital output values'
                'version_fpga'    : (0xfc, 2, 15, 0, 'ro', 'FPGA version number'),
                'version_machine' : (0xfe, 2, 15, 0, 'ro', 'Machine type code'),
                'fpga_serial'     : (0x38, 7, 55, 0, 'ro', 'FPGA serial number'),
+               'shift_test'      : (0x20, 5, 39, 0, 'ro', 'shift test register'),
                }
 
 # fields of kovan_cmds
@@ -414,27 +352,302 @@ def dumpKovanRegs():
         ret = kovanGet(regname)
         print '0x' + int2base(ret,16) + ': ' + regname + ' - ' + desc[kcmd_desc]
 
+def dutyFromPercent(percentage):
+    return int( (percentage / 100.0) * 4095 )
+
+def driveCode(code):
+    retval = 0
+    for i in range (3, -1, -1):
+        if code[i] == 'f':
+            retval |= 0x2
+        elif code[i] == 'r':
+            retval |= 0x1
+        elif code[i] == 'x':  # short stop
+            retval |= 0x3
+        else:
+            retval |= 0
+        retval = retval << 2
+
+    return retval
+
 def setDefaults():
     kovanSet('dig_out_val', 0x0)
+    kovanSet('dig_pu', 0x0)
+    kovanSet('dig_oe', 0x0)
+    kovanSet('ana_pu', 0x0)
+    kovanSet('mot_allstop', 1)
+    kovanSet('mot_drive_code', driveCode(['s','s','s','s']))
+    kovanSet('servo_pwm_period', servo_period)
+    kovanSet('servo0_pwm_pulse', servo_zero)
+    kovanSet('servo1_pwm_pulse', servo_zero)
+    kovanSet('servo2_pwm_pulse', servo_zero)
+    kovanSet('servo3_pwm_pulse', servo_zero)
+    mot_pwm_divider = (mot_baseclk - 2 * mot_target_rate) / mot_target_rate
+    assert mot_pwm_divder > 0, 'motor PWM divider is negative'
+    kovanSet('mot_pwm_div', mot_pwm_divider)
+    kovanSet('mot_pwm_duty', dutyFromPercent(100))
 
 def isData():
     return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
 
+def printAdc(cmd):
+    anapu = kovanGet('ana_pu')
+    adcChan = kovanGet('adc_chan')
+    if cmd == '1':
+        if adcChan > 0:
+            adcChan = adcChan - 1
+    elif cmd == '2':
+        if adcChan < 15:
+            adcChan = adcChan + 1
+    elif cmd == 'p':
+        if adcChan > 7:
+            if (anapu >> (adcChan - 8)) & 0x1:
+                anapu = anapu & ~(1 << (adcChan - 8))
+            else:
+                anapu = anapu | (1 << (adcChan - 8))
+
+    kovanSet('ana_pu', anapu)
+    kovanSet('dig_update', 0)
+    kovanSet('dig_update', 1)
+    kovanSet('dig_update', 0)
+    kovanSet('adc_chan', adcChan)
+    kovanSet('adc_go', 1 )
+    kovanSet('adc_go', 0 )
+    while kovanGet('adc_valid') == 0:
+        dummy = 1  # just wait
+    val = kovanGet('adc_in')
+    ostr = 'ADC' + str(adcChan) + ': ' + int2base(val, 10) 
+    print ostr + ' ' * (12 - len(ostr)),
+    for i in range(8):
+        if( anapu & 0x1 ):
+            sys.stdout.write(str(i))  # get rid of trailing space :P
+        else:
+            sys.stdout.write('.')
+        anapu = anapu >> 1
+    print '    ',
+    print ('#' * ((40 * val) / 1024) )
+
+def motorTest(cmd):
+    return  # placeholder
+
+# setup servo angle tracking state
+s_state = [180, 180, 180, 180]
+s_sel = 0
+def servoTest(cmd):
+    global s_state
+    global s_sel
+
+    if cmd >= '1' and cmd <= '4':
+        s_sel = (int(cmd) - 1)
+    elif cmd == ',':
+        if s_state[s_sel] >= 0:
+            s_state[s_sel] = s_state[s_sel] - 1
+    elif cmd == '<':
+        if s_state[s_sel] >= 10:
+            s_state[s_sel] = s_state[s_sel] - 10
+        else:
+            s_state[s_sel] = 0
+    elif cmd == '.':
+        if s_state[s_sel] < 360:
+            s_state[s_sel] = s_state[s_sel] + 1
+    elif cmd == '>':
+        if s_state[s_sel] < 350:
+            s_state[s_sel] = s_state[s_sel] + 10
+        else:
+            s_state[s_sel] = 359
+    elif cmd == '0':
+        s_state[s_sel] = 180
+
+    key = 'servo' + str(s_sel) + '_pwm_pulse'
+    servo_setting = int((servo_max - servo_min) * (s_state[s_sel] / 360.0)) + servo_min
+    kovanSet(key, servo_setting)
+
+    for i in range(4):
+        if i == s_sel:
+            print '>',
+        else:
+            print ' ',
+        print str(s_state[i]) + ' ' * (5 - len(str(s_state[i]))) + '|',
+
+    print ' '
+
+digChan = 0 # meh
+def ioTest(cmd):
+    global digChan
+    digout = kovanGet('dig_out_val')
+    digoe = kovanGet('dig_oe')
+    digpu = kovanGet('dig_pu')
+    digin = kovanGet('dig_in_val')
+    if cmd == '+':
+        if (digpu >> digChan) & 0x1:
+            digpu = digpu & ~(1 << digChan)
+        else:
+            digpu = digpu | (1 << digChan)
+    elif cmd == 'i':
+        digoe = digoe & ~(1 << digChan)
+    elif cmd == 'o':
+        digoe = digoe | (1 << digChan)
+    elif cmd == '<':
+        if digChan > 0:
+            digChan = digChan - 1
+    elif cmd == '>':
+        if digChan < 7:
+            digChan = digChan + 1
+    elif (cmd >= '0') and (cmd <= '7'):
+        j = int(cmd)
+        if( (digout >> j) & 0x1):
+            digout = digout & ~(1 << j)
+        else:
+            digout = digout | (1 << j)
+
+    kovanSet('dig_out_val', digout)
+    kovanSet('dig_oe', digoe)
+    kovanSet('dig_pu', digpu)
+    kovanSet('dig_update', 1)
+    kovanSet('dig_update', 0)
+    kovanSet('dig_sample', 0) # capture new digital values
+    kovanSet('dig_sample', 1)
+
+    st = kovanGet('shift_test')
+    print '0x' + int2base(st, 16)
+    print 'in:   ',
+    for i in range(8):
+        if(digin & 0x1):
+            sys.stdout.write('*')
+        else:
+            sys.stdout.write('.')
+        digin = digin >> 1
+
+    print ' '
+    print 'pu:   ',
+    for i in range(8):
+        if(digpu & 0x1):
+            sys.stdout.write('*')
+        else:
+            sys.stdout.write('.')
+        digpu = digpu >> 1
+
+    print ' '
+    print 'oe:   ',
+    for i in range(8):
+        if(digoe & 0x1):
+            sys.stdout.write('o')
+        else:
+            sys.stdout.write('i')
+        digoe = digoe >> 1
+
+    print ' '
+    print 'out:  ',
+    for i in range(8):
+        if(digout & 0x1):
+            sys.stdout.write('*')
+        else:
+            sys.stdout.write('.')
+        digout = digout >> 1
+    print ' '
+
+    if digChan == 0:
+        print 'chan: ^      7'
+    elif digChan == 7:
+        print 'chan: 0      ^'
+    else: 
+        print 'chan: 0' + ' ' * (digChan - 1) + '^' + ' ' * (6 - digChan) + '7'
+
+    print '\n'
+
+
 def interact():
+    mode = 'normal'
+
     while True:
+        if mode == 'adc':
+            printAdc(cmd)
+        elif mode == 'motor':
+            motorTest(cmd)
+        elif mode == 'io':
+            ioTest(cmd)
+        elif mode == 'servo':
+            servoTest(cmd)
+
         cmd = ''
         if isData():
             cmd = sys.stdin.read(1)
-        if cmd == 'q':
-            break
-        elif cmd == 'D':
-            dumpKovanRegs()
+            
+        if mode == 'adc':
+            if cmd == 'q':
+                mode = 'normal'
+                print "Exiting interactive ADC mode"
+                continue
+
+        if mode == 'motor':
+            if cmd == 'q':
+                mode = 'normal'
+                print "Exiting interactive motor mode"
+                kovanSet('mot_allstop', 1)
+                kovanSet('mot_drive_code', driveCode(['s','s','s','s']))
+                continue
+
+        if mode == 'io':
+            if cmd == 'q':
+                mode = 'normal'
+                print "Exiting interactive IO mode"
+                continue
+            
+        if mode == 'servo':
+            if cmd == 'q':
+                mode = 'normal'
+                print "Exiting interactive servo mode"
+                continue
+
+        else: # mode == 'normal' or otherwise
+            if cmd == 'q':
+                break
+            elif cmd == '?':
+                printInteractiveHelp()
+            elif cmd == 'A':
+                print "Entering interactive ADC mode"
+                mode = 'adc'
+            elif cmd == 'M':
+                print "Entering interactive motor mode"
+                kovanSet('mot_allstop', 0)
+                kovanSet('mot_drive_code', driveCode(['s','s','s','s']))
+                mode = 'motor'
+            elif cmd == 'I':
+                print "Entering interactive IO mode"
+                mode = 'io'
+            elif cmd == 'S':
+                print "Entering interactine servo mode"
+                mode = 'servo'
+            elif cmd == 'D':
+                dumpKovanRegs()
+
+def printInteractiveHelp():
+    print "Interactive options:"
+    print "D           dumps all defined kovan FPGA control registers"
+    print "A           go into ADC testing mode (1/2 to change channel, p to toggle pullup)"
+    print "I           go into digital IO testing mode"
+    print "              0-7 to toggle ouput value"
+    print "              shift + 0-7 to toggle pull-up enable"
+    print "              < / > to pick direction set, i / o to set direction"
+    print "M           go into motor testing mode"
+    print "              wasd or ,aoe controls direction"
+    print "              1 to decrease speed and 2 to increase speed"
+    print "              x to toggle all-stop"
+    print "S           go into servo testing mode"
+    print "              1-4 selects servo channel"
+    print "              , / . and < / > controls rotor angle; 0 returns to 0-point"
 
 def printHelp():
     print sys.argv[0] + " [cmd] [args...]"
     print "where cmd is: "
     print "? --help            prints this help"
     print "D --dump            dumps all defined kovan FPGA control registers"
+    print "--fast-charge       set fast charge mode"
+    print "--trickle-charge    set trickle charge mode"
+    print "--adc8-battery      set ADC8 to measure the battery"
+    print "--adc8-user         set ADC8 to measure user inputs"
+    print "-dw <addr> <data>   write data at addr to DDR2"
+    print "-dr <addr>          read data at addr from DDR2"
     print "--unit-tests        run unit tests (development only)x"
     print "\nOr you may use any of these direct commands:"
     print "providing an argument writes that value, otherwise, it will read."
@@ -452,16 +665,25 @@ def runTests():
         print t
         result = t()
 
+
+def checkVersion():
+    vers = kovanGet('version_fpga')
+    if vers != latestVersion:
+        print "Warning: FPGA is not latest version, expected " + str(latestVersion) + " got " + str(vers)
+        
 ### beginning of the main code
 # runTests()   # now called as a command line argument
 
 setDefaults()
+
+checkVersion()
 
 ### setup interaction to be canonical mode
 if( len(sys.argv) < 2 ):
     old_settings = termios.tcgetattr(sys.stdin)
     try:
         tty.setcbreak(sys.stdin.fileno())
+        printInteractiveHelp()
         interact()
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
@@ -478,6 +700,52 @@ else:
     elif cmd == '--unit-tests':
         print "running unit tests"
         runTests()
+    elif cmd == '-dw':
+        addr = int(sys.argv[2],16)
+        data = int(sys.argv[3],16)
+        kovanSet('ddr2_test_addr', addr)
+        kovanSet('ddr2_write_data', data)
+        kovanSet('ddr2_rdwr', 0)
+        kovanSet('ddr2_docmd', 1)
+        kovanSet('ddr2_docmd', 0)
+    elif cmd == '-dr':
+        addr = int(sys.argv[2])
+        kovanSet('ddr2_test_addr', addr)
+        kovanSet('ddr2_rdwr', 1)
+        kovanSet('ddr2_docmd', 1)
+        kovanSet('ddr2_docmd', 0)
+        data = kovanGet('ddr2_read_data')
+        print '0x' + int2base(addr, 16) + ': 0x' + int2base(data,16)
+    elif cmd == '--fast-charge':
+        subprocess.call(['regutil', '-w', 'MFP_100=0x4c40'])
+        subprocess.call(['regutil', '-w', 'GPIO4_SDR=0x10'])
+        subprocess.call(['regutil', '-w', 'GPIO4_PSR=0x10'])
+        """
+        try:
+            gpio_export = open("/sys/class/gpio/export", 'w')
+            gpio_export.write('100\n')
+            gpio_export.close()
+        except IOError, e:
+            dummy = 1
+        gpio_dir = open("/sys/class/gpio/gpio100/direction", 'w')
+        gpio_dir.write('out\n')
+        gpio_dir.close()
+        gpio_value = open("/sys/class/gpio/gpio100/value", 'w')
+        gpio_value.write('0\n')
+        gpio_value.close()
+        """
+    elif cmd == '--trickle-charge':
+        subprocess.call(['regutil', '-w', 'MFP_100=0x4c40'])
+        subprocess.call(['regutil', '-w', 'GPIO4_SDR=0x10'])
+        subprocess.call(['regutil', '-w', 'GPIO4_PCR=0x10'])
+    elif cmd == '--adc8-battery':
+        subprocess.call(['regutil', '-w', 'MFP_79=0xac80'])
+        subprocess.call(['regutil', '-w', 'GPIO3_SDR=0x8000'])
+        subprocess.call(['regutil', '-w', 'GPIO3_PSR=0x8000'])
+    elif cmd == '--adc8-user':
+        subprocess.call(['regutil', '-w', 'MFP_79=0xac80'])
+        subprocess.call(['regutil', '-w', 'GPIO3_SDR=0x8000'])
+        subprocess.call(['regutil', '-w', 'GPIO3_PCR=0x8000'])
     else:
         if sys.argv[1] in kovan_cmds:
             if len(sys.argv) == 2:
