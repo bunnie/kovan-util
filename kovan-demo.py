@@ -358,6 +358,7 @@ def dutyFromPercent(percentage):
 def driveCode(code):
     retval = 0
     for i in range (3, -1, -1):
+        retval = retval << 2
         if code[i] == 'f':
             retval |= 0x2
         elif code[i] == 'r':
@@ -366,7 +367,6 @@ def driveCode(code):
             retval |= 0x3
         else:
             retval |= 0
-        retval = retval << 2
 
     return retval
 
@@ -427,8 +427,61 @@ def printAdc(cmd):
     print '    ',
     print ('#' * ((40 * val) / 1024) )
 
+m_state = ['s','s','s','s']
+m_sel = 0
+m_speed = 100
+m_allstop = 0
 def motorTest(cmd):
-    return  # placeholder
+    global m_state
+    global m_sel
+    global m_speed
+    global m_allstop
+    if cmd >= '1' and cmd <= '4':
+        m_sel = (int(cmd) - 1)
+    elif cmd == ',':
+        if m_speed >= 0:
+            m_speed = m_speed - 1
+    elif cmd == '<':
+        if m_speed >= 10:
+            m_speed = m_speed - 10
+        else:
+            m_speed = 0
+    elif cmd == '.':
+        if m_speed < 100:
+            m_speed = m_speed + 1
+    elif cmd == '>':
+        if m_speed < 90:
+            m_speed = m_speed + 10
+        else:
+            m_speed = 100
+    elif cmd == 'x':
+        m_allstop = 0 if m_allstop else 1
+    elif cmd == 'f':
+        m_state[m_sel] = 'f'
+    elif cmd == 'r':
+        m_state[m_sel] = 'r'
+    elif cmd == 's':
+        m_state[m_sel] = 's'
+    elif cmd == 'b':
+        m_state[m_sel] = 'x'
+
+    kovanSet('mot_pwm_duty', dutyFromPercent(m_speed))
+    kovanSet('mot_allstop', m_allstop)
+    kovanSet('mot_drive_code', driveCode(m_state))
+
+    if m_allstop == 1:
+        print 'speed: all stopped ',
+    else:
+        print 'speed: ' + str(m_speed) + ' ',
+
+    for i in range(4):
+        if i == m_sel:
+            sys.stdout.write('>')
+        else:
+            sys.stdout.write(' ')
+        print  m_state[i],
+
+    print ' '
 
 # setup servo angle tracking state
 s_state = [180, 180, 180, 180]
@@ -630,8 +683,9 @@ def printInteractiveHelp():
     print "              shift + 0-7 to toggle pull-up enable"
     print "              < / > to pick direction set, i / o to set direction"
     print "M           go into motor testing mode"
-    print "              wasd or ,aoe controls direction"
-    print "              1 to decrease speed and 2 to increase speed"
+    print "              1-4 to select motor channel"
+    print "              f/r/s/b to control forward/reverse/stop/short break"
+    print "              < / > to control speed"
     print "              x to toggle all-stop"
     print "S           go into servo testing mode"
     print "              1-4 selects servo channel"
