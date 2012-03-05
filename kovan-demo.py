@@ -722,7 +722,7 @@ def runTests():
 
 def checkVersion():
     vers = kovanGet('version_fpga')
-    if vers != latestVersion:
+    if vers < latestVersion:
         print "Warning: FPGA is not latest version, expected " + str(latestVersion) + " got " + str(vers)
         
 ### beginning of the main code
