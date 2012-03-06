@@ -15,7 +15,7 @@ import select
 import tty
 
 ####### constants
-latestVersion = 3
+latestVersion = 4
 
 # servo constants
 timediv = 1.0 / 13000000  # time granularity of servo counter, 13 MHz period clock
