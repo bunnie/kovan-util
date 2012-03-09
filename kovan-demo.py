@@ -690,6 +690,7 @@ def printInteractiveHelp():
     print "S           go into servo testing mode"
     print "              1-4 selects servo channel"
     print "              , / . and < / > controls rotor angle; 0 returns to 0-point"
+    print "q           quits a given interactive mode; or at this menu, quits the program."
 
 def printHelp():
     print sys.argv[0] + " [cmd] [args...]"
@@ -702,7 +703,7 @@ def printHelp():
     print "--adc8-user         set ADC8 to measure user inputs"
     print "-dw <addr> <data>   write data at addr to DDR2"
     print "-dr <addr>          read data at addr from DDR2"
-    print "--unit-tests        run unit tests (development only)x"
+    print "--unit-tests        run unit tests (development only)"
     print "\nOr you may use any of these direct commands:"
     print "providing an argument writes that value, otherwise, it will read."
     cmds = kovan_cmds.keys()
