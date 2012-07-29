@@ -680,7 +680,7 @@ def printInteractiveHelp():
     print "A           go into ADC testing mode (1/2 to change channel, p to toggle pullup)"
     print "I           go into digital IO testing mode"
     print "              0-7 to toggle ouput value"
-    print "              shift + 0-7 to toggle pull-up enable"
+    print "              + to toggle pull-up enable"
     print "              < / > to pick direction set, i / o to set direction"
     print "M           go into motor testing mode"
     print "              1-4 to select motor channel"
