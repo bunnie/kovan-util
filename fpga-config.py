@@ -4,6 +4,7 @@ import subprocess
 import re
 from struct import *
 import sys
+from subprocess import call
 
 def parseBitfileHeader(bitfile, fpgaType):
     # skip first three sections
@@ -89,6 +90,12 @@ try:
     fpgadev.write(binaryData)
     fpgadev.close()
     print "done."
+    if( re.match('6slx9csg324', fpgaType) ):
+        print "Reconfiguring frame buffer for CEA 640x480 compliance after frame doubling..."
+        call(['regutil', '-w', 'LCD_SPU_V_H_ACTIVE=0x00f00140'])
+        call(['regutil', '-w', 'LCD_SPUT_V_H_TOTAL=0x01070190'])
+        call(['regutil', '-w', 'LCD_SPU_H_PORCH=0x00180008'])
+        call(['regutil', '-w', 'LCD_SPU_V_PORCH=0x00110005'])
 
 except IOError, e:
     print e
